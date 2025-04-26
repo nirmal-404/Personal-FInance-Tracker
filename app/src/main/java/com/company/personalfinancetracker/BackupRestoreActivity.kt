@@ -1,5 +1,7 @@
 package com.company.personalfinancetracker
 
+import android.annotation.SuppressLint
+import android.content.Intent
 import android.os.Bundle
 import android.view.MenuItem
 import android.widget.Button
@@ -43,6 +45,7 @@ class BackupRestoreActivity : AppCompatActivity() {
         setupButtonListeners()
     }
 
+    @SuppressLint("SetTextI18n")
     private fun updateLastBackupDate() {
         val lastBackupTime = sharedPreferencesManager.getLastBackupTime()
 
@@ -61,7 +64,7 @@ class BackupRestoreActivity : AppCompatActivity() {
         }
 
         btnRestore.setOnClickListener {
-            performRestore()
+            pickBackupFile()
         }
     }
 
@@ -95,12 +98,20 @@ class BackupRestoreActivity : AppCompatActivity() {
         }
     }
 
+    private fun pickBackupFile() {
+        val intent = Intent(Intent.ACTION_OPEN_DOCUMENT).apply {
+            addCategory(Intent.CATEGORY_OPENABLE)
+            type = "application/json"
+        }
+        startActivityForResult(intent, 1001)
+    }
+
     private fun performRestore() {
         try {
-            val jsonData = fileHelper.readBackupFile()
+            val jsonData = fileHelper.readBackupFromDownloads()
 
             if (jsonData == null) {
-                Toast.makeText(this, "No backup file found", Toast.LENGTH_SHORT).show()
+                Toast.makeText(this, "No backup file found in Downloads", Toast.LENGTH_SHORT).show()
                 return
             }
 
@@ -129,4 +140,31 @@ class BackupRestoreActivity : AppCompatActivity() {
         }
         return super.onOptionsItemSelected(item)
     }
+
+    override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
+        super.onActivityResult(requestCode, resultCode, data)
+
+        if (requestCode == 1001 && resultCode == RESULT_OK) {
+            val uri = data?.data ?: return
+
+            try {
+                val inputStream = contentResolver.openInputStream(uri)
+                val jsonData = inputStream?.bufferedReader().use { it?.readText() }
+
+                if (!jsonData.isNullOrEmpty()) {
+                    val transactions = fileHelper.jsonToTransactions(jsonData)
+                    sharedPreferencesManager.clearTransactions()
+                    transactions.forEach {
+                        sharedPreferencesManager.saveTransaction(it)
+                    }
+                    Toast.makeText(this, "Restored ${transactions.size} transactions", Toast.LENGTH_SHORT).show()
+                } else {
+                    Toast.makeText(this, "No data found in selected backup", Toast.LENGTH_SHORT).show()
+                }
+            } catch (e: Exception) {
+                Toast.makeText(this, "Restore failed: ${e.message}", Toast.LENGTH_SHORT).show()
+            }
+        }
+    }
+
 }

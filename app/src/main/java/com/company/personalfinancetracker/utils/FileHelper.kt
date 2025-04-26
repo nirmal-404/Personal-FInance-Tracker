@@ -84,6 +84,28 @@ class FileHelper(private val context: Context) {
         }
     }
 
+    fun readBackupFromDownloads(): String? {
+        return try {
+            val downloadsDir = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS)
+            val backupFile = File(downloadsDir, backupFileName)
+
+            if (!backupFile.exists()) {
+                Log.d(TAG, "Backup file not found in Downloads: ${backupFile.absolutePath}")
+                return null
+            }
+
+            val bytes = ByteArray(backupFile.length().toInt())
+            FileInputStream(backupFile).use { fis ->
+                fis.read(bytes)
+            }
+
+            String(bytes)
+        } catch (e: Exception) {
+            Log.e(TAG, "Error reading backup from Downloads: ${e.message}")
+            null
+        }
+    }
+
     // Check if backup file exists
     fun backupExists(): Boolean {
         val backupFile = File(context.filesDir, backupFileName)
